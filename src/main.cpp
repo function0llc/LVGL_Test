@@ -246,6 +246,10 @@ void buildUI()
     lv_obj_set_style_shadow_width(imageWidget, 18, 0);
     lv_obj_set_style_shadow_color(imageWidget, lv_color_hex(0x101010), 0);
 
+    lv_obj_t *hello = lv_label_create(screen);
+    lv_label_set_text(hello, "Hello World");
+    lv_obj_align(hello, LV_ALIGN_CENTER, 0, 0);
+
     lv_obj_t *hint = lv_label_create(screen);
     lv_label_set_text(hint, "Tap to shift the image");
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -16);
