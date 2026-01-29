@@ -248,6 +248,7 @@ void buildUI()
 
     lv_obj_t *hello = lv_label_create(screen);
     lv_label_set_text(hello, "Hello World");
+    lv_obj_set_style_text_color(hello, lv_color_hex(0xFF0000), 0);
     lv_obj_align(hello, LV_ALIGN_CENTER, 0, 0);
 
     lv_obj_t *hint = lv_label_create(screen);
