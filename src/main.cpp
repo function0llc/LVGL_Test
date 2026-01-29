@@ -52,12 +52,14 @@ struct TouchPoint
 };
 
 static TouchPoint lastTouch;
+static bool hasReceivedTouch = false;
 
 static lv_color_t *lvBuffer1 = nullptr;
 static lv_color_t *lvBuffer2 = nullptr;
 static lv_disp_draw_buf_t drawBuffer;
 static lv_disp_drv_t dispDriver;
 static lv_indev_drv_t indevDriver;
+static lv_indev_t *touchIndev = nullptr;
 static lv_img_dsc_t demoImage;
 static lv_color_t demoImagePixels[DEMO_IMG_WIDTH * DEMO_IMG_HEIGHT];
 static lv_obj_t *imageWidget = nullptr;
@@ -78,7 +80,6 @@ void initTouch()
 {
     if (PIN_TOUCH_CS < 0)
     {
-        Serial.println("Touch CS disabled, skipping touch init");
         return;
     }
 
@@ -121,6 +122,7 @@ TouchPoint readTouch()
     }
 
     TS_Point raw = touch.getPoint();
+    
     if (raw.z == 0)
     {
         return point;
@@ -158,6 +160,7 @@ void lvglTouchRead(lv_indev_drv_t *driver, lv_indev_data_t *data)
         data->point.x = point.x;
         data->point.y = point.y;
         lastTouch = point;
+        hasReceivedTouch = true;  // Track that we've received at least one touch
     }
     else
     {
@@ -183,7 +186,6 @@ bool initLVGL()
 
     std::memset(lvBuffer1, 0, LVGL_BUFFER_PIXELS * sizeof(lv_color_t));
     std::memset(lvBuffer2, 0, LVGL_BUFFER_PIXELS * sizeof(lv_color_t));
-    Serial.println("LVGL buffers cleared");
 
     lv_disp_draw_buf_init(&drawBuffer, lvBuffer1, lvBuffer2, LVGL_BUFFER_PIXELS);
 
@@ -197,7 +199,7 @@ bool initLVGL()
     lv_indev_drv_init(&indevDriver);
     indevDriver.type = LV_INDEV_TYPE_POINTER;
     indevDriver.read_cb = lvglTouchRead;
-    lv_indev_drv_register(&indevDriver);
+    touchIndev = lv_indev_drv_register(&indevDriver);
 
     return true;
 }
@@ -235,10 +237,9 @@ void generateDemoImage()
 
 void buildUI()
 {
-    Serial.println("buildUI: applying background and label colors");
     lv_obj_t *screen = lv_scr_act();
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0000FF), 0);
-    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x0000FF), 0);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0xFF0000), 0);
+    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0xFF0000), 0);
     lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, 0);
 
     lv_obj_t *title = lv_label_create(screen);
@@ -264,14 +265,26 @@ void buildUI()
 
 void updateImageFromTouch()
 {
-    if (!imageWidget || !lastTouch.valid)
+    if (!imageWidget || !hasReceivedTouch)
     {
         return;
     }
 
+    // Update image position based on last touch coordinates (supports tap-to-shift)
+    // We use hasReceivedTouch instead of lastTouch.valid to persist position after release
     int16_t x = constrain(lastTouch.x - DEMO_IMG_WIDTH / 2, 0, LCD_WIDTH - DEMO_IMG_WIDTH);
     int16_t y = constrain(lastTouch.y - DEMO_IMG_HEIGHT / 2, 0, LCD_HEIGHT - DEMO_IMG_HEIGHT);
-    lv_obj_set_pos(imageWidget, x, y);
+    static int16_t lastX = -1;
+    static int16_t lastY = -1;
+
+    if (x != lastX || y != lastY)
+    {
+        lv_obj_set_pos(imageWidget, x, y);
+        lv_obj_invalidate(imageWidget);
+        lv_refr_now(nullptr);
+        lastX = x;
+        lastY = y;
+    }
 }
 
 void setup()
@@ -288,11 +301,8 @@ void setup()
         }
     }
 
-    Serial.printf("Configured LCD size: %dx%d\n", LCD_WIDTH, LCD_HEIGHT);
-    Serial.printf("Setting panel rotation: %u\n", LCD_ROTATION);
     gfx->setRotation(LCD_ROTATION);
 
-    Serial.println("Clearing display before LVGL init");
     gfx->fillScreen(0x0000);
 
     initTouch();
@@ -306,18 +316,29 @@ void setup()
         }
     }
 
-    Serial.printf("LVGL driver size: %dx%d\n", dispDriver.hor_res, dispDriver.ver_res);
-
     buildUI();
 
-    Serial.println("Forcing first LVGL refresh before enabling backlight");
     lv_refr_now(nullptr);
     initBacklight();
 }
 
 void loop()
 {
+    static uint32_t lastTouchPoll = 0;
+
     lv_timer_handler();
     updateImageFromTouch();
+
+    if (millis() - lastTouchPoll >= 50)
+    {
+        TouchPoint point = readTouch();
+        if (point.valid)
+        {
+            lastTouch = point;
+            hasReceivedTouch = true;
+        }
+        lastTouchPoll = millis();
+    }
+
     delay(5);
 }

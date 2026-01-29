@@ -58,11 +58,15 @@ TS_Point SimpleXPT2046::getPoint()
         return point;
     }
 
+    // When IRQ is available, only read if touch detected
     if (irq >= 0 && digitalRead(irq) != LOW)
     {
         lastZ = 0;
         return point;
     }
+
+    // For polling mode (no IRQ), always attempt to read SPI data
+    // The Z threshold check below will filter out non-touches
 
     SPISettings settings(TOUCH_SPI_FREQUENCY, MSBFIRST, SPI_MODE0);
     spi->beginTransaction(settings);
