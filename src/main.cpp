@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <algorithm>
+#include <cstring>
 #include <esp_heap_caps.h>
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
@@ -180,6 +181,10 @@ bool initLVGL()
         return false;
     }
 
+    std::memset(lvBuffer1, 0, LVGL_BUFFER_PIXELS * sizeof(lv_color_t));
+    std::memset(lvBuffer2, 0, LVGL_BUFFER_PIXELS * sizeof(lv_color_t));
+    Serial.println("LVGL buffers cleared");
+
     lv_disp_draw_buf_init(&drawBuffer, lvBuffer1, lvBuffer2, LVGL_BUFFER_PIXELS);
 
     lv_disp_drv_init(&dispDriver);
@@ -230,9 +235,10 @@ void generateDemoImage()
 
 void buildUI()
 {
+    Serial.println("buildUI: applying background and label colors");
     lv_obj_t *screen = lv_scr_act();
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x202833), 0);
-    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x0C1018), 0);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x0000FF), 0);
+    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x0000FF), 0);
     lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, 0);
 
     lv_obj_t *title = lv_label_create(screen);
@@ -248,8 +254,8 @@ void buildUI()
 
     lv_obj_t *hello = lv_label_create(screen);
     lv_label_set_text(hello, "Hello World");
-    lv_obj_set_style_text_color(hello, lv_color_hex(0x00FF00), 0);
-    lv_obj_align(hello, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_color(hello, lv_color_hex(0xFFFF00), 0);
+    lv_obj_align_to(hello, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);
 
     lv_obj_t *hint = lv_label_create(screen);
     lv_label_set_text(hint, "Tap to shift the image");
@@ -281,9 +287,14 @@ void setup()
             delay(500);
         }
     }
-    gfx->setRotation(0);
 
-    initBacklight();
+    Serial.printf("Configured LCD size: %dx%d\n", LCD_WIDTH, LCD_HEIGHT);
+    Serial.printf("Setting panel rotation: %u\n", LCD_ROTATION);
+    gfx->setRotation(LCD_ROTATION);
+
+    Serial.println("Clearing display before LVGL init");
+    gfx->fillScreen(0x0000);
+
     initTouch();
 
     if (!initLVGL())
@@ -295,7 +306,13 @@ void setup()
         }
     }
 
+    Serial.printf("LVGL driver size: %dx%d\n", dispDriver.hor_res, dispDriver.ver_res);
+
     buildUI();
+
+    Serial.println("Forcing first LVGL refresh before enabling backlight");
+    lv_refr_now(nullptr);
+    initBacklight();
 }
 
 void loop()
