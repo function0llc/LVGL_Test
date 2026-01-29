@@ -41,4 +41,4 @@ values. Rebuild and flash to apply the calibration.
 
 - Replace the generated image with a logo or bitmap converted via `lv_img_conv` (drop the output into `src/` and point `lv_img_set_src` to it).
 - Feed touch diagnostics (raw + calibrated) to the serial monitor or an on-screen label to simplify calibration.
-- Add automated tests or CI builds (e.g., `pio test`, `pio run`) when project scope grows.
+- Add automated tests or CI builds (e.g., `pio test`, `pio run`) when project scope grows..
